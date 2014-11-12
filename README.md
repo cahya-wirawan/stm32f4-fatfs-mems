@@ -22,10 +22,6 @@ The Embest BB board does not have the ability to detect when a card is inserted
         Unmount the SD card 
     mkfs [partition]
         Format the [partition], starts at 0
-    getlabel
-        Get the label of the default partition.
-    setlabel [label]
-        Set the label of the default partition.
     tree
         Print the file structure
     free
@@ -37,9 +33,9 @@ The Embest BB board does not have the ability to detect when a card is inserted
     cat [file]
         Echo  [file] to the terminal.
         
-    A shell is attached to both:
-        USART1: PA9(TX) & PA10(RX)
-        USART2: PD5(TX) & PD6(RX)
+    A simple command shell is activated on virtual serial port SD2 via USB-CDC
+      driver (use micro-USB plug on STM32F4-Discovery board).
+
 ** Build Procedure **
 
 The demo has been tested by using the free GCC-based toolchain included with 
