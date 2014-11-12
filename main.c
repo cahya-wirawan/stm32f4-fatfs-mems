@@ -14,7 +14,7 @@
     limitations under the License.
  */
 
-/***** FATFS-01 **********/
+/***** FATFS-MEMS **********/
 
 #include <stdio.h>
 #include <string.h>
@@ -214,10 +214,8 @@ int main(void) {
    */
   shellInit();
   
-  /*
-   * Start SD Driver
-   */
-  sdcStart(&SDCD1, NULL);
+  sdcStart(&SDCD1, NULL);       /* Start SD Driver */
+  spiStart(&SPID1, &spi1cfg);   /* Initializes the SPI driver 1 in order to access the MEMS */
   
   /*
    * Initializes a serial-over-USB CDC driver.
@@ -239,7 +237,6 @@ int main(void) {
    * Initializes the SPI driver 1 in order to access the MEMS. The signals
    * are already initialized in the board file.
    */
-  spiStart(&SPID1, &spi1cfg);
 
   /*
    * Creates the blinker thread.
