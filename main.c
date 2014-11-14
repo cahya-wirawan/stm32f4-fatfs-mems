@@ -35,7 +35,20 @@
 /* Virtual serial port over USB.*/
 SerialUSBDriver SDU1;
 int32_t accX, accY;
-bool debug=FALSE;
+bool _debug=FALSE;
+
+/*
+ * SPI1 configuration structure.
+ * Speed 5.25MHz, CPHA=1, CPOL=1, 8bits frames, MSb transmitted first.
+ * The slave select line is the pin GPIOE_CS_SPI on the port GPIOE.
+ */
+static const SPIConfig spi1cfg = {
+  NULL,
+  /* HW dependent part.*/
+  GPIOE,
+  GPIOE_CS_SPI,
+  SPI_CR1_BR_0 | SPI_CR1_BR_1 | SPI_CR1_CPOL | SPI_CR1_CPHA
+};
 
 /*===========================================================================*/
 /* Command line related.                                                     */
@@ -79,17 +92,17 @@ static void cmd_threads(BaseSequentialStream *chp, int argc, char *argv[]) {
 static void cmd_debug(BaseSequentialStream *chp, int argc, char *argv[]) {
   (void)argv;
   if (argc != 1) {
-    chprintf(chp, "debug = %d\r\n", debug);
+    chprintf(chp, "debug = %d\r\n", _debug);
     chprintf(chp, "Usage: debug <1|0>\r\n");
     return;
   }
   if (strcmp(argv[0], "1") == 0) {
-    debug = TRUE;
+    _debug = TRUE;
   }
   else if(strcmp(argv[0], "0") == 0) {
-    debug = FALSE;
+    _debug = FALSE;
   }
-  chprintf(chp, "debug = %d\r\n", debug);
+  chprintf(chp, "debug = %d\r\n", _debug);
 }
 
 static const ShellCommand commands[] = {
@@ -113,19 +126,6 @@ static const ShellConfig shell_cfg1 = {
 };
 
 /*
- * SPI1 configuration structure.
- * Speed 5.25MHz, CPHA=1, CPOL=1, 8bits frames, MSb transmitted first.
- * The slave select line is the pin GPIOE_CS_SPI on the port GPIOE.
- */
-static const SPIConfig spi1cfg = {
-  NULL,
-  /* HW dependent part.*/
-  GPIOE,
-  GPIOE_CS_SPI,
-  SPI_CR1_BR_0 | SPI_CR1_BR_1 | SPI_CR1_CPOL | SPI_CR1_CPHA
-};
-
-/*
  * This is a periodic thread that reads accelerometer and outputs
  * result to SPI2 and PWM.
  */
@@ -133,7 +133,7 @@ static WORKING_AREA(waThreadAccelerometer, 128);
 static msg_t ThreadAccelerometer(void *arg) {
   static int8_t xbuf[4], ybuf[4];   /* Last accelerometer data.*/
   systime_t time;                   /* Next deadline.*/
-  static int32_t counter;
+  static int32_t counter=0;
   
   (void)arg;
   chRegSetThreadName("Accelerometer");
@@ -147,6 +147,11 @@ static msg_t ThreadAccelerometer(void *arg) {
   time = chTimeNow();
   while (TRUE) {
     unsigned i;
+    
+    counter++;
+    
+    if(SPID1.state != SPI_READY)
+      continue;
     
     /* Keeping an history of the latest four accelerometer readings.*/
     for (i = 3; i > 0; i--) {
@@ -164,7 +169,8 @@ static msg_t ThreadAccelerometer(void *arg) {
     accY = ((int32_t)ybuf[0] + (int32_t)ybuf[1] +
             (int32_t)ybuf[2] + (int32_t)ybuf[3]) / 4;
     if(counter%5 == 0) {
-      if(debug)
+      palTogglePad(GPIOD, GPIOD_LED5);
+      if(_debug)
         chprintf((BaseSequentialStream *)&SDU1, "X:%d, Y:%d\r\n", accX, accY);
     }
     if(counter==1000000)
