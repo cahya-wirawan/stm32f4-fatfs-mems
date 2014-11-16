@@ -25,6 +25,7 @@
 
 /* Generic large buffer.*/
 static char fbuff[1024];
+static FATFS SDC_FS;
 
 /*
  * Scan Files in a path and print them to the character stream.
@@ -122,7 +123,6 @@ FRESULT scan_files(BaseSequentialStream *chp, char *path) {
 
 void cmd_mount(BaseSequentialStream *chp, int argc, char *argv[]) {
 	FRESULT err;
-	DIR dir;
 	(void)argc;
 	(void)argv;
 	/*

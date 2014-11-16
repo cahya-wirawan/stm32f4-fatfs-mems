@@ -23,19 +23,14 @@
 #include "hal.h"
 /* ChibiOS Supplementary Includes */
 #include "chprintf.h"
-#include "shell.h"
-/* FatFS */
-#include "ff.h"
-#include "lis302dl.h"
 /* Project includes */
-#include "fat.h"
+#include "command.h"
 
 #include "usbcfg.h"
 
 /* Virtual serial port over USB.*/
-SerialUSBDriver SDU1;
+extern SerialUSBDriver SDU1;
 int32_t accX, accY;
-bool _debug=FALSE;
 
 /*
  * SPI1 configuration structure.
@@ -50,80 +45,6 @@ static const SPIConfig spi1cfg = {
   SPI_CR1_BR_0 | SPI_CR1_BR_1 | SPI_CR1_CPOL | SPI_CR1_CPHA
 };
 
-/*===========================================================================*/
-/* Command line related.                                                     */
-/*===========================================================================*/
-
-#define SHELL_WA_SIZE   THD_WA_SIZE(2048)
-#define TEST_WA_SIZE    THD_WA_SIZE(256)
-
-static void cmd_mem(BaseSequentialStream *chp, int argc, char *argv[]) {
-  size_t n, size;
-  (void)argv;
-  if (argc > 0) {
-    chprintf(chp, "Usage: mem\r\n");
-    return;
-  }
-  n = chHeapStatus(NULL, &size);
-  chprintf(chp, "core free memory : %u bytes\r\n", chCoreStatus());
-  chprintf(chp, "heap fragments   : %u\r\n", n);
-  chprintf(chp, "heap free total  : %u bytes\r\n", size);
-}
-
-static void cmd_threads(BaseSequentialStream *chp, int argc, char *argv[]) {
-  static const char *states[] = {THD_STATE_NAMES};
-  Thread *tp;
-  (void)argv;
-  if (argc > 0) {
-    chprintf(chp, "Usage: threads\r\n");
-    return;
-  }
-  chprintf(chp, "    addr    stack prio refs     state time\r\n");
-  tp = chRegFirstThread();
-  do {
-    chprintf(chp, "%.8lx %.8lx %4lu %4lu %9s %lu\r\n",
-             (uint32_t)tp, (uint32_t)tp->p_ctx.r13,
-             (uint32_t)tp->p_prio, (uint32_t)(tp->p_refs - 1),
-             states[tp->p_state], (uint32_t)tp->p_time);
-    tp = chRegNextThread(tp);
-  } while (tp != NULL);
-}
-
-static void cmd_debug(BaseSequentialStream *chp, int argc, char *argv[]) {
-  (void)argv;
-  if (argc != 1) {
-    chprintf(chp, "debug = %d\r\n", _debug);
-    chprintf(chp, "Usage: debug <1|0>\r\n");
-    return;
-  }
-  if (strcmp(argv[0], "1") == 0) {
-    _debug = TRUE;
-  }
-  else if(strcmp(argv[0], "0") == 0) {
-    _debug = FALSE;
-  }
-  chprintf(chp, "debug = %d\r\n", _debug);
-}
-
-static const ShellCommand commands[] = {
-  {"mkfs", cmd_mkfs},
-  {"mount", cmd_mount},
-  {"unmount", cmd_unmount},
-  {"tree", cmd_tree},
-  {"free", cmd_free},
-  {"mkdir", cmd_mkdir},
-  {"hello", cmd_hello},
-  {"cat", cmd_cat},
-  {"mem", cmd_mem},
-  {"threads", cmd_threads},
-  {"debug", cmd_debug},
-  {NULL, NULL}
-};
-
-static const ShellConfig shell_cfg1 = {
-  (BaseSequentialStream *)&SDU1,
-  commands
-};
 
 /*
  * This is a periodic thread that reads accelerometer and outputs
@@ -170,7 +91,7 @@ static msg_t ThreadAccelerometer(void *arg) {
             (int32_t)ybuf[2] + (int32_t)ybuf[3]) / 4;
     if(counter%5 == 0) {
       palTogglePad(GPIOD, GPIOD_LED5);
-      if(_debug)
+      if(cmdGetDebug())
         chprintf((BaseSequentialStream *)&SDU1, "X:%d, Y:%d\r\n", accX, accY);
     }
     if(counter==1000000)
@@ -203,7 +124,6 @@ static msg_t ThreadLed(void *arg) {
  * Application entry point.
  */
 int main(void) {
-  Thread *shelltp = NULL;
 
   /*
    * System initializations.
@@ -262,18 +182,17 @@ int main(void) {
   chRegSetThreadName("main");
   chThdSetPriority(LOWPRIO);
   while (TRUE) {
-    if (!shelltp) {
+    if (!cmdIsShellRunning()) {
       if (SDU1.config->usbp->state == USB_ACTIVE) {
         /* Spawns a new shell.*/
-        shelltp = shellCreate(&shell_cfg1, SHELL_WA_SIZE, NORMALPRIO);
+        cmdShellCreate();
       }
     }
     else {
       /* If the previous shell exited.*/
-      if (chThdTerminated(shelltp)) {
+      if (cmdIsShellTerminated()) {
         /* Recovers memory of the previous shell.*/
-        chThdRelease(shelltp);
-        shelltp = NULL;
+        cmdShellRelease();
       }
     }
     chThdSleepMilliseconds(500);

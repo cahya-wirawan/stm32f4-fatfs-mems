@@ -16,7 +16,9 @@
  * @brief FS object.
  */
 
+/*
 static FATFS SDC_FS;
+*/
 FRESULT scan_files(BaseSequentialStream *chp, char *path);
 void cmd_mount(BaseSequentialStream *chp, int argc, char *argv[]);
 void cmd_unmount(BaseSequentialStream *chp, int argc, char *argv[]);
