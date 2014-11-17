@@ -11,7 +11,6 @@
 #include "shell.h"
 /* FatFS */
 #include "ff.h"
-#include "lis302dl.h"
 /* Project includes */
 #include "fat.h"
 
